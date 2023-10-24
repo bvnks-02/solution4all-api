@@ -5,6 +5,7 @@ import { productModel } from "../../../Database/models/product.model.js";
 import { orderModel } from "../../../Database/models/order.model.js";
 
 import Stripe from "stripe";
+import { userModel } from "../../../Database/models/user.model.js";
 const stripe = new Stripe(
   "sk_test_REDACTED"
 );
