@@ -1,3 +1,6 @@
-/node_modules
-/.env
-/demo.json
+node_modules/
+.env
+uploads/products/
+uploads/category/
+*.log
+.DS_Store

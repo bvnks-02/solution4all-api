@@ -2,57 +2,96 @@ import { userModel } from "../../../Database/models/user.model.js";
 import { AppError } from "../../utils/AppError.js";
 import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
 
-const signUp = catchAsyncError(async (req, res, next) => {
-  // console.log(req.body.email);
-  let isUserExist = await userModel.findOne({ email: req.body.email });
-  if (isUserExist) {
-    return next(new AppError("Account is already exist!", 409));
-  }
-  const user = new userModel(req.body);
-  await user.save();
+const JWT_SECRET = process.env.JWT_SECRET || "solution4all-dev-secret";
 
-  let token = jwt.sign(
+const signToken = (user) => {
+  return jwt.sign(
     { email: user.email, name: user.name, id: user._id, role: user.role },
-    "JR"
+    JWT_SECRET,
+    { expiresIn: "7d" }
   );
-  res.status(201).json({ message: "success", user, token });
-});
+};
+
+const verifyToken = (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new AppError("Token was not provided", 401);
+  }
+
+  const token = authHeader.split(" ")[1];
+  return jwt.verify(token, JWT_SECRET);
+};
 
 const signIn = catchAsyncError(async (req, res, next) => {
   const { email, password } = req.body;
-  let user = await userModel.findOne({ email });
-  if (!user || !bcrypt.compareSync(password, user.password)) {
+
+  const user = await userModel.findOne({ email });
+  if (!user || !user.correctPassword(password)) {
     return next(new AppError("Invalid email or password", 401));
   }
-  let token = jwt.sign(
-    { email: user.email, name: user.name, id: user._id, role: user.role },
-    "JR"
-  );
-  res.status(201).json({ message: "success", token });
+
+  const token = signToken(user);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      token,
+      record: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        created: user.createdAt,
+        updated: user.updatedAt,
+      },
+    },
+  });
+});
+
+const authRefresh = catchAsyncError(async (req, res, next) => {
+  let decoded;
+  try {
+    decoded = verifyToken(req);
+  } catch (err) {
+    return next(new AppError("Invalid or expired token", 401));
+  }
+
+  const user = await userModel.findById(decoded.id);
+  if (!user) {
+    return next(new AppError("User not found", 404));
+  }
+
+  const newToken = signToken(user);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      token: newToken,
+      record: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        created: user.createdAt,
+        updated: user.updatedAt,
+      },
+    },
+  });
 });
 
 const protectedRoutes = catchAsyncError(async (req, res, next) => {
-  const { token } = req.headers;
-  if (!token) return next(new AppError("Token was not provided!", 401));
-
-  let decoded = await jwt.verify(token, "JR");
-
-  // console.log(decoded);
-  // console.log(decoded.iat);
-
-  let user = await userModel.findById(decoded.id);
-  if (!user) return next(new AppError("Invalid user", 404));
-  // console.log(user);
-  // console.log(user.passwordChangedAt);
-
-  if (user.passwordChangedAt) {
-    let passwordChangedAt = parseInt(user.passwordChangedAt.getTime() / 1000);
-    if (passwordChangedAt > decoded.iat)
-      return next(new AppError("Invalid token", 401));
+  let decoded;
+  try {
+    decoded = verifyToken(req);
+  } catch (err) {
+    return next(new AppError("Invalid or expired token", 401));
   }
-  // console.log(decoded.iat, "-------------->",passwordChangedAt);
+
+  const user = await userModel.findById(decoded.id);
+  if (!user) {
+    return next(new AppError("Invalid user", 404));
+  }
 
   req.user = user;
   next();
@@ -60,14 +99,16 @@ const protectedRoutes = catchAsyncError(async (req, res, next) => {
 
 const allowedTo = (...roles) => {
   return catchAsyncError(async (req, res, next) => {
-    if (!roles.includes(req.user.role))
+    if (!roles.includes(req.user.role)) {
       return next(
         new AppError(
-          `You are not authorized to access this route. Your are ${req.user.role}`,
-          401
+          `You are not authorized to access this route. Your role is ${req.user.role}`,
+          403
         )
       );
+    }
     next();
   });
 };
-export { signUp, signIn, protectedRoutes, allowedTo };
+
+export { signIn, authRefresh, protectedRoutes, allowedTo };

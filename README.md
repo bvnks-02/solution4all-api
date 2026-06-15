@@ -1,138 +1,106 @@
+# Solution4All Backend
 
-# E-Commerce Backend
+Express + MongoDB backend for the Solution4All e-commerce platform.
 
-Welcome to the E-Commerce Backend, an advanced server-side application that provides a robust foundation for building a comprehensive e-commerce platform. This backend system is designed to facilitate seamless online shopping experiences, from product browsing to checkout and order fulfillment.
+## Setup
 
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Project Overview
+2. Copy `.env.example` to `.env` and configure:
+   ```bash
+   cp .env.example .env
+   ```
 
-Our e-commerce backend is a Node.js application that leverages Express.js for creating a structured, scalable, and efficient RESTful API. The system is backed by MongoDB, a NoSQL database, to ensure high performance and flexible data handling for e-commerce operations.
+3. Start MongoDB locally or update `MONGODB_URI` in `.env`
 
-## Features
+4. Seed the database:
+   ```bash
+   npm run seed
+   ```
 
-- **User Authentication and Authorization:** Secure sign-up and sign-in processes with role-based access control, allowing for clear distinction between customer and administrator privileges.
-- **Product Management:** A full suite of CRUD operations for products, enabling administrators to add, update, remove, and retrieve products with ease.
-- **Order Processing:** Robust order management system that allows customers to place orders, and admins to process them through a streamlined workflow.
-- **Shopping Cart:** Persistent shopping cart functionality, complete with add-to-cart, update quantities, and remove items features.
-- **Payments Integration:** Integration with payment gateways like Stripe for handling transactions and supporting various payment methods.
-- **Discounts and Coupons:** Dynamic coupon creation and application system to offer discounts and promotions to customers.
-- **Reviews and Ratings:** Users can leave reviews and rate products, fostering community engagement and providing valuable feedback.
-- **Wishlist:** Customers can create and manage wishlists, bookmarking their favorite items for future purchase.
-- **Scalable Architecture:** Designed with best practices in mind, ensuring that the backend can scale with the growing needs of the business.
-
-
-## Prerequisites
-
-- Node.js (v18.12.0 or higher)
-- MongoDB (Running on the default port)
-- npm (for dependency management)
-
-## Installation
-
-Clone the repository and install dependencies:
-
-```bash
-git clone https://github.com/AbdeIkader/eCommerce-Backend.git
-cd eCommerce-Backend
-npm install
-```
-
-Set up your environment variables in a `.env` file:
-
-```env
-MODE=dev
-MONGO_URL=mongodb://127.0.0.1:27017/EcommerceC40
-BASE_URL=http://localhost:3000/
-```
-
-## Running the Server
-
-```bash
-npm start
-```
+5. Start the server:
+   ```bash
+   npm start
+   ```
 
 ## API Endpoints
 
-### Authentication
-- POST `/signup`: Register a new user.
-- POST `/signin`: Login for existing users.
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | /api/v1/auth/signin | Public | Admin login |
+| POST | /api/v1/auth/refresh | Admin | Refresh token |
+| GET | /api/v1/products | Public | List products |
+| GET | /api/v1/products/slug/:slug | Public | Get product by slug |
+| GET | /api/v1/products/:id | Public | Get product by ID |
+| POST | /api/v1/products | Admin | Create product |
+| PUT | /api/v1/products/:id | Admin | Update product |
+| DELETE | /api/v1/products/:id | Admin | Delete product |
+| GET | /api/v1/services | Public | List services |
+| GET | /api/v1/services/:id | Public | Get service |
+| POST | /api/v1/services | Admin | Create service |
+| PUT | /api/v1/services/:id | Admin | Update service |
+| DELETE | /api/v1/services/:id | Admin | Delete service |
+| POST | /api/v1/orders | Public | Create order |
+| GET | /api/v1/orders | Admin | List orders |
+| GET | /api/v1/orders/:id | Admin | Get order |
+| PATCH | /api/v1/orders/:id | Admin | Update order |
+| POST | /api/v1/contact-submissions | Public | Submit contact form |
+| GET | /api/v1/contact-submissions | Admin | List submissions |
+| GET | /api/v1/contact-submissions/count | Admin | Count submissions |
+| PATCH | /api/v1/contact-submissions/:id | Admin | Update submission |
+| DELETE | /api/v1/contact-submissions/:id | Admin | Delete submission |
+| POST | /api/v1/analytics-events | Public | Track event |
+| GET | /api/v1/analytics-events | Admin | List events |
+| GET | /api/v1/analytics-events/count | Admin | Count events |
+| GET | /api/v1/users | Admin | List users |
+| GET | /api/v1/users/:id | Admin | Get user |
+| PUT | /api/v1/users/:id | Admin | Update user |
+| DELETE | /api/v1/users/:id | Admin | Delete user |
+| PATCH | /api/v1/users/:id | Admin | Change password |
 
-### Address Management
-- PATCH `/address`: Update an address for a user.
-- DELETE `/address`: Remove an address for a user.
-- GET `/address`: Retrieve all addresses for a user.
+## Query Parameters
 
-### Brand Management
-- POST `/brand`: Add a new brand (admin).
-- GET `/brand`: List all brands.
-- PUT `/brand/:id`: Update a brand (admin).
-- DELETE `/brand/:id`: Delete a brand (admin).
+### Pagination
+- `page` - Page number (default: 1)
+- `perPage` - Items per page (default: 30)
 
-### Cart Management
-- POST `/cart`: Add a product to the cart.
-- GET `/cart`: Get the user's cart.
-- POST `/cart/apply-coupon`: Apply a coupon to the cart.
-- DELETE `/cart/:id`: Remove a product from the cart.
-- PUT `/cart/:id`: Update product quantity in the cart.
+### Sorting
+- `sort` - Comma-separated sort fields (prefix with `-` for descending)
+  - Example: `sort=-created,price_dzd`
+  - Mapped fields: `created` → `createdAt`, `updated` → `updatedAt`
 
-### Category Management
-- POST `/category`: Add a new category (admin).
-- GET `/category`: List all categories.
-- PUT `/category/:id`: Update a category (admin).
-- DELETE `/category/:id`: Delete a category (admin).
+### Filtering (Products)
+- `category` - Filter by category
+- `active` - Filter by active status (`true`/`false`)
+- `featured` - Filter by featured status (`true`/`false`)
+- `search` - Search in name_fr and description_fr
 
-### Coupon Management
-- POST `/coupon`: Create a new coupon (admin/user).
-- GET `/coupon`: List all coupons.
-- PUT `/coupon/:id`: Update a coupon (admin/user).
-- DELETE `/coupon/:id`: Delete a coupon (admin/user).
-- GET `/coupon/:id`: Retrieve a specific coupon.
+### Filtering (Orders)
+- `status` - Filter by order status
 
-### Order Management
-- POST `/order/:id`: Create a cash order (user).
-- GET `/order`: Get a specific order (user).
-- POST `/order/checkOut/:id`: Create a checkout session (user).
-- GET `/order/all`: List all orders.
+### Filtering (Contact Submissions)
+- `status` - Filter by submission status
+- `department` - Filter by department
+- `search` - Search in full_name, email, subject
 
-### Product Management
-- POST `/product`: Add a new product (admin/user).
-- GET `/product`: List all products.
-- PUT `/product/:id`: Update a product (admin).
-- DELETE `/product/:id`: Delete a product (admin).
-- GET `/product/:id`: Retrieve a specific product.
+### Filtering (Analytics Events)
+- `event_type` - Filter by event type
+- `device_type` - Filter by device type
+- `dateFrom` - Filter from date (ISO string)
+- `dateTo` - Filter to date (ISO string)
 
-### Review Management
-- POST `/review`: Add a new review (user).
-- GET `/review`: List all reviews.
-- PUT `/review/:id`: Update a review (user).
-- DELETE `/review/:id`: Delete a review (admin/user).
+## Authentication
 
-### Subcategory Management
-- POST `/subcategory`: Add a new subcategory (admin/user).
-- GET `/subcategory`: List all subcategories.
-- PUT `/subcategory/:id`: Update a subcategory (admin/user).
-- DELETE `/subcategory/:id`: Delete a subcategory (admin/user).
+All admin endpoints require a Bearer token in the Authorization header:
+```
+Authorization: Bearer <token>
+```
 
-### User Management
-- POST `/user`: Add a new user.
-- GET `/user`: List all users.
-- PUT `/user/:id`: Update a user.
-- DELETE `/user/:id`: Delete a user.
-- PATCH `/user/:id`: Change a user's password.
+Get a token via `POST /api/v1/auth/signin` with `{ email, password }`.
 
-### Wishlist Management
-- PATCH `/wishlist`: Add to wishlist (user).
-- DELETE `/wishlist`: Remove from wishlist (user).
-- GET `/wishlist`: Get all items in a user's wishlist.
+## Environment Variables
 
-## Contributing
-
-Contributions are welcome! Please fork the repository and open a pull request with your features or fixes.
-
-## Licensing
-
-This project is licensed under the ISC License. See the LICENSE file for details.
-
-## Contact
-
-Questions or feedback? Contact me at abdelrahmanabdelkader2002@gmail.com
+See `.env.example` for all configuration options.

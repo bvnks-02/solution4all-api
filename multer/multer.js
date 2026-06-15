@@ -1,40 +1,33 @@
 import multer from "multer";
-import { v4 as uuidv4 } from "uuid";
-import { AppError } from "../src/utils/AppError.js";
+import crypto from "crypto";
+import path from "path";
 
 const createMulterUploader = (folderName) => {
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      // console.log(file);
       cb(null, `uploads/${folderName}`);
     },
     filename: (req, file, cb) => {
-      // console.log(file);
-      cb(null, uuidv4() + " - " + file.originalname);
+      const ext = path.extname(file.originalname);
+      cb(null, crypto.randomUUID() + ext);
     },
   });
 
   function fileFilter(req, file, cb) {
     if (file.mimetype.startsWith("image/")) {
-      // To accept the file pass `true`, like so:
       cb(null, true);
     } else {
-      // To reject this file pass `false`, like so:
-      cb(new AppError("Not supporting this mimetype", 401), false);
+      cb(new Error("Only image files are allowed"), false);
     }
   }
 
-  const upload = multer({ storage, fileFilter });
-
-  return upload;
+  return multer({ storage, fileFilter });
 };
 
-//For Single upload
 export const uploadSingleFile = (fieldName, folderName) => {
   return createMulterUploader(folderName).single(fieldName);
 };
 
-//Fir Multiple fields upload
 export const uploadMultipleFiles = (arrayOfFields, folderName) => {
   return createMulterUploader(folderName).fields(arrayOfFields);
 };

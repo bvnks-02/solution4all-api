@@ -2,98 +2,74 @@ import { Schema, model } from "mongoose";
 
 const productSchema = new Schema(
   {
-    title: {
+    slug: {
       type: String,
       required: true,
       unique: true,
       trim: true,
-      minLength: [3, "Too Short product Name"],
+      lowercase: true,
     },
-    imgCover: {
+    name_fr: {
       type: String,
-    },
-    images: {
-      type: [String],
-    },
-    descripton: {
-      type: String,
-      maxlength: [100, "Description should be less than or equal to 100"],
-      minlength: [10, "Description should be more than or equal to 10"],
       required: true,
       trim: true,
     },
-    price: {
+    description_fr: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    price_dzd: {
       type: Number,
-      default: 0,
-      min: 0,
       required: true,
-    },
-    priceAfterDiscount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    quantity: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    sold: {
-      type: Number,
-      default: 0,
       min: 0,
     },
     category: {
-      type: Schema.ObjectId,
-      ref: "category",
+      type: String,
       required: true,
+      enum: [
+        "ordinateurs",
+        "imprimantes",
+        "onduleurs",
+        "serveurs",
+        "consommables",
+        "logiciels",
+        "licences",
+      ],
     },
-    subcategory: {
-      type: Schema.ObjectId,
-      ref: "subcategory",
-      required: true,
-    },
-    brand: {
-      type: Schema.ObjectId,
-      ref: "brand",
-      required: true,
-    },
-    ratingAvg: {
+    stock: {
       type: Number,
-      min: 1,
-      max: 5,
-    },
-    ratingCount: {
-      type: Number,
+      default: 0,
       min: 0,
     },
+    sku: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    brand: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    images: {
+      type: [String],
+      default: [],
+    },
+    active: {
+      type: Boolean,
+      default: true,
+    },
+    featured: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true ,toJSON: { virtuals: true },toObject: { virtuals: true } }
+  { timestamps: true }
 );
 
-productSchema.post('init',function(doc){
+productSchema.index({ slug: 1 });
+productSchema.index({ category: 1, active: 1 });
+productSchema.index({ featured: -1, name_fr: 1 });
 
-  if(doc.imgCover && doc.images){
-
-    doc.imgCover = `${process.env.BASE_URL}products/${doc.imgCover}`
-    doc.images = doc.images.map((ele)=>{
-     return `${process.env.BASE_URL}products/${ele}`
-    })
-  }
-
-  
-})
-
-productSchema.virtual('reviews', {
-  ref: 'review',
-  localField: '_id',
-  foreignField: 'productId',
-});
-
-productSchema.pre(['find','findOne'],function (){
-  this.populate('reviews')
-})
-
-export const productModel = model("product", productSchema);
-
-
+export const productModel = model("Product", productSchema);

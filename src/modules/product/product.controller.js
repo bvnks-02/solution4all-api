@@ -1,61 +1,122 @@
 import slugify from "slugify";
 import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
-import { deleteOne } from "../../handlers/factor.js";
-import { productModel } from "./../../../Database/models/product.model.js";
-import { ApiFeatures } from "../../utils/ApiFeatures.js";
+import { parseSort } from "../../utils/parseSort.js";
+import { paginate } from "../../utils/paginate.js";
+import { productModel } from "../../../Database/models/product.model.js";
 
 const addProduct = catchAsyncError(async (req, res, next) => {
-  // console.log(req.files);
-  req.body.imgCover = req.files.imgCover[0].filename;
-  req.body.images = req.files.images.map((ele) => ele.filename);
+  if (req.files) {
+    if (req.files.images) {
+      req.body.images = req.files.images.map((f) => f.filename);
+    }
+  }
 
-  // console.log(req.body.imgCover, req.body.images);
-  req.body.slug = slugify(req.body.title);
-  const addProduct = new productModel(req.body);
-  await addProduct.save();
+  if (req.body.name_fr) {
+    req.body.slug = slugify(req.body.name_fr, { lower: true, strict: true });
+  }
 
-  res.status(201).json({ message: "success", addProduct });
+  const product = new productModel(req.body);
+  await product.save();
+
+  res.status(201).json({ success: true, data: product });
 });
 
 const getAllProducts = catchAsyncError(async (req, res, next) => {
-  let apiFeature = new ApiFeatures(productModel.find(), req.query)
-    .pagination()
-    .fields()
-    .filteration()
-    .search()
-    .sort();
-  const PAGE_NUMBER = apiFeature.queryString.page * 1 || 1;
-  const getAllProducts = await apiFeature.mongooseQuery;
-
-  res
-    .status(201)
-    .json({ page: PAGE_NUMBER, message: "success", getAllProducts });
+  const query = {};
+  if (req.query.category) query.category = req.query.category;
+  if (req.query.active !== undefined) query.active = req.query.active === "true";
+  if (req.query.featured !== undefined) query.featured = req.query.featured === "true";
+  if (req.query.search) {
+    const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    query.$or = [
+      { name_fr: { $regex: escaped, $options: "i" } },
+      { description_fr: { $regex: escaped, $options: "i" } },
+    ];
+  }
+  const sort = parseSort(req.query.sort);
+  const { items, meta } = await paginate(productModel, query, { ...req.query, sort });
+  res.status(200).json({ success: true, data: items, meta });
 });
+
+const getProductBySlug = catchAsyncError(async (req, res, next) => {
+  const { slug } = req.params;
+  const product = await productModel.findOne({ slug });
+
+  if (!product) {
+    return next(new AppError("Product not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: product });
+});
+
 const getSpecificProduct = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const getSpecificProduct = await productModel.findByIdAndUpdate(id);
-  res.status(201).json({ message: "success", getSpecificProduct });
+  const product = await productModel.findById(id);
+
+  if (!product) {
+    return next(new AppError("Product not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: product });
 });
 
 const updateProduct = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  if (req.body.title) {
-    req.body.slug = slugify(req.body.title);
+
+  if (req.files) {
+    if (req.files.images) {
+      req.body.images = req.files.images.map((f) => f.filename);
+    }
   }
-  const updateProduct = await productModel.findByIdAndUpdate(id, req.body, {
-    new: true,
-  });
 
-  updateProduct && res.status(201).json({ message: "success", updateProduct });
+  if (req.body.name_fr) {
+    req.body.slug = slugify(req.body.name_fr, { lower: true, strict: true });
+  }
 
-  !updateProduct && next(new AppError("Product was not found", 404));
+  // Handle removed images
+  if (req.body.removedImages) {
+    try {
+      const removed = JSON.parse(req.body.removedImages);
+      if (Array.isArray(removed) && removed.length > 0) {
+        // Get current product to access existing images
+        const currentProduct = await productModel.findById(id);
+        if (currentProduct) {
+          const existingImages = currentProduct.images || [];
+          const keptImages = existingImages.filter(name => !removed.includes(name));
+          req.body.images = [...keptImages, ...(req.body.images || [])];
+        }
+      }
+    } catch (e) {
+      // Invalid JSON - ignore
+    }
+    delete req.body.removedImages;
+  }
+
+  const product = await productModel.findByIdAndUpdate(id, req.body, { new: true });
+
+  if (!product) {
+    return next(new AppError("Product not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: product });
 });
 
-const deleteProduct = deleteOne(productModel, "Product");
+const deleteProduct = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const product = await productModel.findByIdAndDelete(id);
+
+  if (!product) {
+    return next(new AppError("Product not found", 404));
+  }
+
+  res.status(200).json({ success: true, message: "Product deleted successfully" });
+});
+
 export {
   addProduct,
   getAllProducts,
+  getProductBySlug,
   getSpecificProduct,
   updateProduct,
   deleteProduct,

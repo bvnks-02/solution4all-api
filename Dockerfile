@@ -1,11 +1,14 @@
-FROM node:18.12.0
+FROM node:18-alpine
 
-WORKDIR app/
+WORKDIR /app
 
-COPY ["package.json","package-lock.json","./"]
-
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
 
 COPY . .
 
-CMD ["npm","start"]
+RUN mkdir -p uploads/products uploads/category
+
+EXPOSE 3000
+
+CMD ["node", "index.js"]

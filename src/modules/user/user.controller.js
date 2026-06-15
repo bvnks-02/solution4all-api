@@ -1,54 +1,67 @@
 import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
-import { deleteOne } from "../../handlers/factor.js";
-import { ApiFeatures } from "../../utils/ApiFeatures.js";
 import { userModel } from "../../../Database/models/user.model.js";
-import bcrypt from "bcrypt";
-
-const addUser = catchAsyncError(async (req, res, next) => {
-  const addUser = new userModel(req.body);
-  await addUser.save();
-
-  res.status(201).json({ message: "success", addUser });
-});
 
 const getAllUsers = catchAsyncError(async (req, res, next) => {
-  let apiFeature = new ApiFeatures(userModel.find(), req.query)
-    .pagination()
-    .fields()
-    .filteration()
-    .search()
-    .sort();
-  const PAGE_NUMBER = apiFeature.queryString.page * 1 || 1;
-  const getAllUsers = await apiFeature.mongooseQuery;
+  const users = await userModel.find().select("-password");
 
-  res.status(201).json({ page: PAGE_NUMBER, message: "success", getAllUsers });
+  res.status(200).json({ success: true, data: users });
+});
+
+const getUserById = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const user = await userModel.findById(id).select("-password");
+
+  if (!user) {
+    return next(new AppError("User not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: user });
 });
 
 const updateUser = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const updateUser = await userModel.findByIdAndUpdate(id, req.body, {
-    new: true,
-  });
+  const { name, email } = req.body;
 
-  updateUser && res.status(201).json({ message: "success", updateUser });
+  const updateData = {};
+  if (name) updateData.name = name;
+  if (email) updateData.email = email;
 
-  !updateUser && next(new AppError("User was not found", 404));
+  const user = await userModel.findByIdAndUpdate(id, updateData, { new: true }).select("-password");
+
+  if (!user) {
+    return next(new AppError("User not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: user });
 });
 
-const changeUserPassword = catchAsyncError(async (req, res, next) => {
+const deleteUser = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  req.body.passwordChangedAt = Date.now();
-  console.log(req.body.passwordChangedAt);
-  const changeUserPassword = await userModel.findByIdAndUpdate(id, req.body, {
-    new: true,
-  });
+  const user = await userModel.findByIdAndDelete(id);
 
-  changeUserPassword &&
-    res.status(201).json({ message: "success", changeUserPassword });
+  if (!user) {
+    return next(new AppError("User not found", 404));
+  }
 
-  !changeUserPassword && next(new AppError("User was not found", 404));
+  res.status(200).json({ success: true, message: "User deleted successfully" });
 });
-const deleteUser = deleteOne(userModel, "user");
 
-export { addUser, getAllUsers, updateUser, deleteUser, changeUserPassword };
+const changePassword = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  if (!password) {
+    return next(new AppError("Password is required", 400));
+  }
+
+  const user = await userModel.findByIdAndUpdate(id, { password }, { new: true }).select("-password");
+
+  if (!user) {
+    return next(new AppError("User not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: user });
+});
+
+export { getAllUsers, getUserById, updateUser, deleteUser, changePassword };

@@ -1,173 +1,147 @@
 import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
-import { cartModel } from "../../../Database/models/cart.model.js";
+import { parseSort } from "../../utils/parseSort.js";
+import { paginate } from "../../utils/paginate.js";
 import { productModel } from "../../../Database/models/product.model.js";
 import { orderModel } from "../../../Database/models/order.model.js";
+import { sendMail } from "../../services/mailer.js";
+import { orderConfirmationEmail, orderNotificationEmail } from "../../services/emailTemplates.js";
 
-import Stripe from "stripe";
-import { userModel } from "../../../Database/models/user.model.js";
-const stripe = new Stripe(
-  "sk_test_REDACTED"
-);
+// Generate order number: CMD-YYYYMMDD-XXXX
+async function generateOrderNumber() {
+  const today = new Date();
+  const dateStr = today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, "0") +
+    String(today.getDate()).padStart(2, "0");
 
-const createCashOrder = catchAsyncError(async (req, res, next) => {
-  let cart = await cartModel.findById(req.params.id);
+  const prefix = `CMD-${dateStr}-`;
 
-  // console.log(cart);
-  let totalOrderPrice = cart.totalPriceAfterDiscount
-    ? cart.totalPriceAfterDiscount
-    : cart.totalPrice;
+  // Find the last order number for today
+  const lastOrder = await orderModel
+    .findOne({ order_number: new RegExp(`^${prefix}`) })
+    .sort({ order_number: -1 });
 
-  console.log(cart.cartItem);
-  const order = new orderModel({
-    userId: req.user._id,
-    cartItem: cart.cartItem,
-    totalOrderPrice,
-    shippingAddress: req.body.shippingAddress,
+  let seq = 1;
+  if (lastOrder && lastOrder.order_number) {
+    const lastSeq = parseInt(lastOrder.order_number.split("-").pop(), 10);
+    seq = lastSeq + 1;
+  }
+
+  return `${prefix}${String(seq).padStart(4, "0")}`;
+}
+
+const createOrder = catchAsyncError(async (req, res, next) => {
+  const { items, customer_name, customer_email, customer_phone, customer_company, wilaya, address, notes } = req.body;
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return next(new AppError("Order must have at least one item", 400));
+  }
+
+  // Validate each item and compute totals
+  let subtotal_dzd = 0;
+  const validatedItems = [];
+
+  for (const item of items) {
+    const product = await productModel.findById(item.product_id);
+    if (!product) {
+      return next(new AppError(`Product not found: ${item.product_id}`, 400));
+    }
+    if (!product.active) {
+      return next(new AppError(`Product is not available: ${product.name_fr}`, 400));
+    }
+    if (product.stock < item.qty) {
+      return next(new AppError(`Insufficient stock for: ${product.name_fr}`, 400));
+    }
+
+    const unit_price_dzd = product.price_dzd;
+    const lineTotal = unit_price_dzd * item.qty;
+    subtotal_dzd += lineTotal;
+
+    validatedItems.push({
+      product_id: item.product_id,
+      name_fr: product.name_fr,
+      qty: item.qty,
+      unit_price_dzd,
+    });
+  }
+
+  const order_number = await generateOrderNumber();
+
+  const order = await orderModel.create({
+    order_number,
+    customer_name,
+    customer_email,
+    customer_phone: customer_phone || "",
+    customer_company: customer_company || "",
+    wilaya,
+    address,
+    notes: notes || "",
+    items: validatedItems,
+    subtotal_dzd,
+    total_dzd: subtotal_dzd,
+    source: "boutique",
+    status: "pending",
   });
 
-  await order.save();
-
-  // console.log(order);
-  if (order) {
-    let options = cart.cartItem.map((item) => ({
-      updateOne: {
-        filter: { _id: item.productId },
-        update: { $inc: { quantity: -item.quantity, sold: item.quantity } },
-      },
-    }));
-
-    await productModel.bulkWrite(options);
-
-    await cartModel.findByIdAndDelete(req.params.id);
-
-    return res.status(201).json({ message: "success", order });
-  } else {
-    next(new AppError("Error in cart ID", 404));
+  // Decrement stock for each item
+  for (const item of validatedItems) {
+    await productModel.findByIdAndUpdate(item.product_id, {
+      $inc: { stock: -item.qty },
+    });
   }
-});
 
-const getSpecificOrder = catchAsyncError(async (req, res, next) => {
-  console.log(req.user._id);
+  // Send notification emails (non-blocking)
+  const notificationEmail = orderNotificationEmail(order);
+  sendMail({
+    to: process.env.ORDER_EMAIL || "e-commerce@solution4all.dz",
+    subject: notificationEmail.subject,
+    html: notificationEmail.html,
+  }).catch((err) => console.error("Failed to send order notification:", err.message));
 
-  let order = await orderModel
-    .findOne({ userId: req.user._id })
-    .populate("cartItems.productId");
+  const confirmationEmail = orderConfirmationEmail(order);
+  sendMail({
+    to: order.customer_email,
+    subject: confirmationEmail.subject,
+    html: confirmationEmail.html,
+  }).catch((err) => console.error("Failed to send order confirmation:", err.message));
 
-  res.status(200).json({ message: "success", order });
+  res.status(201).json({ success: true, data: order });
 });
 
 const getAllOrders = catchAsyncError(async (req, res, next) => {
-  let orders = await orderModel.findOne({}).populate("cartItems.productId");
-
-  res.status(200).json({ message: "success", orders });
+  const query = {};
+  if (req.query.status) query.status = req.query.status;
+  const sort = parseSort(req.query.sort);
+  const { items, meta } = await paginate(orderModel, query, { ...req.query, sort });
+  res.status(200).json({ success: true, data: items, meta });
 });
 
-const createCheckOutSession = catchAsyncError(async (req, res, next) => {
-  let cart = await cartModel.findById(req.params.id);
-  if(!cart) return next(new AppError("Cart was not found",404))
+const getSpecificOrder = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const order = await orderModel.findById(id);
 
-  console.log(cart);
+  if (!order) {
+    return next(new AppError("Order not found", 404));
+  }
 
-  // console.log(cart);
-  let totalOrderPrice = cart.totalPriceAfterDiscount
-    ? cart.totalPriceAfterDiscount
-    : cart.totalPrice;
-
-  let sessions = await stripe.checkout.sessions.create({
-    line_items: [
-      {
-        price_data: {
-          currency: "egp",
-          unit_amount: totalOrderPrice * 100,
-          product_data: {
-            name: req.user.name,
-          },
-        },
-        quantity: 1,
-      },
-    ],
-    mode: "payment",
-    success_url: "https://github.com/AbdeIkader",
-    cancel_url: "https://www.linkedin.com/in/abdelrahman-abdelkader-259781215/",
-    customer_email: req.user.email,
-    client_reference_id: req.params.id,
-    metadata: req.body.shippingAddress,
-  });
-
-  res.json({ message: "success", sessions });
+  res.status(200).json({ success: true, data: order });
 });
 
-const createOnlineOrder = catchAsyncError(async (request, response) => {
-  const sig = request.headers["stripe-signature"].toString();
+const updateOrder = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const { status, admin_notes } = req.body;
 
-  let event;
+  const updateData = {};
+  if (status) updateData.status = status;
+  if (admin_notes !== undefined) updateData.admin_notes = admin_notes;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      request.body,
-      sig,
-      "whsec_fcatGuOKvXYUQoz5NWSwH9vaqdWXIWsI"
-    );
-  } catch (err) {
-    return response.status(400).send(`Webhook Error: ${err.message}`);
+  const order = await orderModel.findByIdAndUpdate(id, updateData, { new: true });
+
+  if (!order) {
+    return next(new AppError("Order not found", 404));
   }
 
-  // Handle the event
-  if (event.type == "checkout.session.completed") {
-    // const checkoutSessionCompleted = event.data.object;
-    card(event.data.object,response)
-
-
-  } else {
-    console.log(`Unhandled event type ${event.type}`);
-  }
+  res.status(200).json({ success: true, data: order });
 });
 
-//https://ecommerce-backend-codv.onrender.com/api/v1/orders/checkOut/6536c48750fab46f309bb950
-
-
-async function card (e,res){
-  let cart = await cartModel.findById(e.client_reference_id);
-
-  if(!cart) return next(new AppError("Cart was not found",404))
-
-  let user = await userModel.findOne({email:e.customer_email})
-  const order = new orderModel({
-    userId: user._id,
-    cartItem: cart.cartItem,
-    totalOrderPrice : e.amount_total/100,
-    shippingAddress: e.metadata.shippingAddress,
-    paymentMethod:"card",
-    isPaid:true,
-    paidAt:Date.now()
-  });
-
-  await order.save();
-
-  // console.log(order);
-  if (order) {
-    let options = cart.cartItem.map((item) => ({
-      updateOne: {
-        filter: { _id: item.productId },
-        update: { $inc: { quantity: -item.quantity, sold: item.quantity } },
-      },
-    }));
-
-    await productModel.bulkWrite(options);
-
-    await cartModel.findOneAndDelete({userId: user._id});
-
-    return res.status(201).json({ message: "success", order });
-  } else {
-    next(new AppError("Error in cart ID", 404));
-  }
-}
-
-export {
-  createCashOrder,
-  getSpecificOrder,
-  getAllOrders,
-  createCheckOutSession,
-  createOnlineOrder,
-};
+export { createOrder, getAllOrders, getSpecificOrder, updateOrder };

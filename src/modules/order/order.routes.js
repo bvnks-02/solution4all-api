@@ -1,28 +1,20 @@
 import express from "express";
-// import { validate } from "../../middlewares/validate.js";
+import * as order from "./order.controller.js";
+import { protectedRoutes, allowedTo } from "../auth/auth.controller.js";
+import { orderLimiter } from "../../middlewares/rateLimiter.js";
 
-import { allowedTo, protectedRoutes } from "../auth/auth.controller.js";
-import * as order from "../order/order.controller.js"
 const orderRouter = express.Router();
 
+// Public: create order (rate limited)
+orderRouter.post("/", orderLimiter, order.createOrder);
 
+// Admin: list all orders
+orderRouter.get("/", protectedRoutes, allowedTo("admin"), order.getAllOrders);
 
+// Admin: get/update specific order
 orderRouter
   .route("/:id")
-  .post(
-    protectedRoutes,
-    allowedTo("user"),
-    order.createCashOrder
-  )
-  orderRouter
-  .route("/")
-  .get(
-    protectedRoutes,
-    allowedTo("user"),
-    order.getSpecificOrder
-  )
+  .get(protectedRoutes, allowedTo("admin"), order.getSpecificOrder)
+  .patch(protectedRoutes, allowedTo("admin"), order.updateOrder);
 
-  orderRouter.post('/checkOut/:id' ,protectedRoutes, allowedTo("user"),order.createCheckOutSession)
-
-  orderRouter.get('/all',order.getAllOrders)
 export default orderRouter;

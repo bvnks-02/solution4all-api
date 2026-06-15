@@ -1,7 +1,5 @@
 export const validate = (schema) => {
   return (req, res, next) => {
-
-    let errors =[]
     const { error } = schema.validate(
       {
         ...req.body,
@@ -11,15 +9,17 @@ export const validate = (schema) => {
       { abortEarly: false }
     );
 
-    console.log(error);
     if (error) {
-        error.details.forEach((ele)=> {
-            res.json({message:ele.message,field:ele.path[0]})
-        });
-      console.log(errors);
-      res.json(errors);
-    }else{
-        next()
+      const errors = error.details.map((d) => ({
+        field: d.path[0],
+        message: d.message,
+      }));
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors,
+      });
     }
+    next();
   };
 };

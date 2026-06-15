@@ -1,6 +1,8 @@
 import mongoose, { Schema, model } from "mongoose";
 import bcrypt from "bcrypt";
 
+const SALT_ROUNDS = 12;
+
 const userSchema = new Schema(
   {
     name: {
@@ -13,49 +15,35 @@ const userSchema = new Schema(
       required: true,
       unique: true,
       trim: true,
+      lowercase: true,
     },
     password: {
       type: String,
       required: true,
     },
-    passwordChangedAt:Date,
     role: {
       type: String,
-      enum: ["admin", "user"],
-      default: "user",
+      enum: ["admin"],
+      default: "admin",
     },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    verified: {
-      type: Boolean,
-      default: false,
-    },
-    blocked: {
-      type: Boolean,
-      default: false,
-    },
-    
-    wishlist:[{type:Schema.ObjectId,ref : 'product'}],
-    addresses:[{
-      city:String,
-      street:String,
-      phone:String
-    }]
   },
   { timestamps: true }
 );
 
 userSchema.pre("save", function () {
-  this.password = bcrypt.hashSync(this.password, 8);
+  if (this.isModified("password")) {
+    this.password = bcrypt.hashSync(this.password, SALT_ROUNDS);
+  }
 });
 
 userSchema.pre("findOneAndUpdate", function () {
-    if(this._update.password){
-        this._update.password = bcrypt.hashSync(this._update.password, 8);
-    }
- 
+  if (this._update.password) {
+    this._update.password = bcrypt.hashSync(this._update.password, SALT_ROUNDS);
+  }
 });
 
-export const userModel = model("user", userSchema);
+userSchema.methods.correctPassword = function (candidatePassword) {
+  return bcrypt.compareSync(candidatePassword, this.password);
+};
+
+export const userModel = model("User", userSchema);

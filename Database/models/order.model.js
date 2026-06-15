@@ -1,43 +1,97 @@
-import { Schema,model } from "mongoose";
+import { Schema, model } from "mongoose";
 
+const orderItemSchema = new Schema({
+  product_id: { type: String, required: true },
+  name_fr: { type: String, required: true },
+  qty: { type: Number, required: true, min: 1 },
+  unit_price_dzd: { type: Number, required: true, min: 0 },
+}, { _id: false });
 
-const orderSchema = new Schema({
-    userId:{
-        type:Schema.ObjectId,
-        required:true,
-        ref:'user'
+const orderSchema = new Schema(
+  {
+    order_number: {
+      type: String,
+      required: true,
+      unique: true,
     },
-    cartItems:[
-        {
-            productId:{type:Schema.ObjectId, ref : "product"},
-            quantity:{
-              type:Number,
-              default:1
-            },
-            price:Number,
-            totalProductDiscount:Number
-          }
-    ],
-    shippingAddress:{
-        street:String,
-        city:String,
-        phone:Number
+    customer_name: {
+      type: String,
+      required: true,
+      trim: true,
     },
-    paymentMethod:{
-        type:String,
-        enum:['card','cash'],
-        default:'cash'
+    customer_email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
     },
-    isPaid:{
-        type:Boolean,
-        default:false
+    customer_phone: {
+      type: String,
+      trim: true,
+      default: "",
     },
-    isDelivered:{
-        type:Boolean,
-        default:false
+    customer_company: {
+      type: String,
+      trim: true,
+      default: "",
     },
-    paidAt:Date,
-    deliveredAt:Date
-})
+    wilaya: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    address: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    items: {
+      type: [orderItemSchema],
+      required: true,
+      validate: [(v) => v.length > 0, "Order must have at least one item"],
+    },
+    subtotal_dzd: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    total_dzd: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    source: {
+      type: String,
+      default: "boutique",
+    },
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+      ],
+      default: "pending",
+    },
+    admin_notes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { timestamps: true }
+);
 
-export const orderModel = model('order',orderSchema)
+orderSchema.index({ order_number: 1 });
+orderSchema.index({ status: 1 });
+orderSchema.index({ customer_email: 1 });
+
+export const orderModel = model("Order", orderSchema);
