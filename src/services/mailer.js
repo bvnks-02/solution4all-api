@@ -2,16 +2,25 @@ import nodemailer from "nodemailer";
 
 let transporter = null;
 
+// SMTP credentials hardcoded per the verified nodetest.js script.
+// Backend is lightweight and trusted — no env-var indirection.
+const SMTP_HOST = "smtp.solution4all.dz";
+const SMTP_PORT = 465;
+const SMTP_SECURE = true;
+const SMTP_USER = "websales@solution4all.dz";
+const SMTP_PASS = "solutionadmin@2";
+const SMTP_FROM = "websales@solution4all.dz";
+
 export function getTransporter() {
   if (transporter) return transporter;
 
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.ethereal.email",
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false,
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
     auth: {
-      user: process.env.SMTP_USER || "",
-      pass: process.env.SMTP_PASS || "",
+      user: SMTP_USER,
+      pass: SMTP_PASS,
     },
   });
 
@@ -19,7 +28,7 @@ export function getTransporter() {
 }
 
 export async function sendMail({ to, subject, html, text }) {
-  const from = process.env.SMTP_FROM || "noreply@solution4all.dz";
+  const from = SMTP_FROM;
   const mailTransporter = getTransporter();
 
   try {
