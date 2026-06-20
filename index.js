@@ -39,6 +39,16 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Static file serving for uploads
 app.use(express.static(path.join(__dirname, "uploads")));
 
+// Health check / root route — prevents 404 on "/" in production (Docker, load balancers)
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Solution4All API",
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 bootstrap(app);
 dbConnection();
 app.listen(port, () => console.log(`Server running on port ${port}`));
