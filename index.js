@@ -47,8 +47,8 @@ if (process.env.NODE_ENV !== "production") {
 // Swagger API docs
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Static file serving for uploads
-app.use(express.static(path.join(__dirname, "uploads")));
+// Static file serving for uploads — mount at /uploads so /uploads/products/x.jpg works
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Health check / root route — prevents 404 on "/" in production (Docker, load balancers)
 app.get("/", (req, res) => {
