@@ -230,20 +230,23 @@ const services = [
 
 async function seed() {
   console.log("Connecting to MongoDB...");
-  console.log(`URI: ${MONGODB_URI}`);
+  console.log(`URI: ${MONGODB_URI.replace(/\/\/.*@/, "//***@")}`);
 
   try {
     await mongoose.connect(MONGODB_URI);
     console.log("Connected to MongoDB");
 
-    // Clear existing data
-    console.log("Clearing existing data...");
-    await productModel.deleteMany({});
-    await serviceModel.deleteMany({});
-    await orderModel.deleteMany({});
-    await contactSubmissionModel.deleteMany({});
-    await analyticsEventModel.deleteMany({});
-    await userModel.deleteMany({});
+    // --- Idempotent: only seed if admin user doesn't exist ---
+    const existingAdmin = await userModel.findOne({ email: "admin@solution4all.dz" });
+    if (existingAdmin) {
+      console.log("✅ Admin user already exists — skipping seed (DB already initialized)");
+      console.log("Admin credentials:");
+      console.log("  Email: admin@solution4all.dz");
+      console.log("  Password: admin123456");
+      process.exit(0);
+    }
+
+    console.log("No admin user found — seeding database...");
 
     // Create admin user
     console.log("Creating admin user...");
@@ -255,62 +258,74 @@ async function seed() {
     });
     console.log(`Admin user created: ${adminUser.email}`);
 
-    // Create products
-    console.log("Creating products...");
-    const createdProducts = await productModel.insertMany(products);
-    console.log(`Created ${createdProducts.length} products`);
-
-    // Create services
-    console.log("Creating services...");
-    const createdServices = await serviceModel.insertMany(services);
-    console.log(`Created ${createdServices.length} services`);
-
-    // Create sample contact submission
-    console.log("Creating sample contact submission...");
-    await contactSubmissionModel.create({
-      full_name: "Ahmed Benali",
-      email: "ahmed@example.dz",
-      phone: "+213 555 123 456",
-      company: "Entreprise ABC",
-      department: "commercial",
-      subject: "Demande de devis pour équipement informatique",
-      message: "Bonjour, nous souhaitons obtenir un devis pour l'équipement informatique de nos nouveaux bureaux à Alger. Merci de nous contacter pour discuter des besoins.",
-      status: "new",
-      source_page: "/contact",
-    });
-
-    // Create sample analytics events
-    console.log("Creating sample analytics events...");
-    const eventTypes = ["page_view", "cta_click", "service_view"];
-    const pagePaths = ["/", "/services", "/boutique", "/contact", "/a-propos"];
-    const devices = ["desktop", "mobile", "tablet"];
-
-    const analyticsEvents = [];
-    for (let i = 0; i < 20; i++) {
-      analyticsEvents.push({
-        event_type: eventTypes[Math.floor(Math.random() * eventTypes.length)],
-        page_path: pagePaths[Math.floor(Math.random() * pagePaths.length)],
-        event_label: `event_${i + 1}`,
-        referrer: i % 3 === 0 ? "https://google.com" : "",
-        session_id: `session_${Math.floor(i / 4) + 1}`,
-        device_type: devices[Math.floor(Math.random() * devices.length)],
-      });
+    // Create products (only if collection is empty)
+    const productCount = await productModel.countDocuments();
+    if (productCount === 0) {
+      console.log("Creating products...");
+      const createdProducts = await productModel.insertMany(products);
+      console.log(`Created ${createdProducts.length} products`);
+    } else {
+      console.log(`Products already exist (${productCount}) — skipping`);
     }
-    await analyticsEventModel.insertMany(analyticsEvents);
-    console.log(`Created ${analyticsEvents.length} analytics events`);
+
+    // Create services (only if collection is empty)
+    const serviceCount = await serviceModel.countDocuments();
+    if (serviceCount === 0) {
+      console.log("Creating services...");
+      const createdServices = await serviceModel.insertMany(services);
+      console.log(`Created ${createdServices.length} services`);
+    } else {
+      console.log(`Services already exist (${serviceCount}) — skipping`);
+    }
+
+    // Create sample contact submission (only if collection is empty)
+    const contactCount = await contactSubmissionModel.countDocuments();
+    if (contactCount === 0) {
+      console.log("Creating sample contact submission...");
+      await contactSubmissionModel.create({
+        full_name: "Ahmed Benali",
+        email: "ahmed@example.dz",
+        phone: "+213 555 123 456",
+        company: "Entreprise ABC",
+        department: "commercial",
+        subject: "Demande de devis pour équipement informatique",
+        message: "Bonjour, nous souhaitons obtenir un devis pour l'équipement informatique de nos nouveaux bureaux à Alger. Merci de nous contacter pour discuter des besoins.",
+        status: "new",
+        source_page: "/contact",
+      });
+    } else {
+      console.log(`Contact submissions already exist (${contactCount}) — skipping`);
+    }
+
+    // Create sample analytics events (only if collection is empty)
+    const analyticsCount = await analyticsEventModel.countDocuments();
+    if (analyticsCount === 0) {
+      console.log("Creating sample analytics events...");
+      const eventTypes = ["page_view", "cta_click", "service_view"];
+      const pagePaths = ["/", "/services", "/boutique", "/contact", "/a-propos"];
+      const devices = ["desktop", "mobile", "tablet"];
+
+      const analyticsEvents = [];
+      for (let i = 0; i < 20; i++) {
+        analyticsEvents.push({
+          event_type: eventTypes[Math.floor(Math.random() * eventTypes.length)],
+          page_path: pagePaths[Math.floor(Math.random() * pagePaths.length)],
+          event_label: `event_${i + 1}`,
+          referrer: i % 3 === 0 ? "https://google.com" : "",
+          session_id: `session_${Math.floor(i / 4) + 1}`,
+          device_type: devices[Math.floor(Math.random() * devices.length)],
+        });
+      }
+      await analyticsEventModel.insertMany(analyticsEvents);
+      console.log(`Created ${analyticsEvents.length} analytics events`);
+    } else {
+      console.log(`Analytics events already exist (${analyticsCount}) — skipping`);
+    }
 
     console.log("\n✅ Seed completed successfully!");
     console.log("\nAdmin credentials:");
     console.log("  Email: admin@solution4all.dz");
     console.log("  Password: admin123456");
-    console.log("\nAPI endpoints:");
-    console.log("  POST /api/v1/auth/signin");
-    console.log("  POST /api/v1/auth/refresh");
-    console.log("  GET  /api/v1/products");
-    console.log("  GET  /api/v1/services");
-    console.log("  POST /api/v1/orders");
-    console.log("  POST /api/v1/contact-submissions");
-    console.log("  POST /api/v1/analytics-events");
 
     process.exit(0);
   } catch (error) {
