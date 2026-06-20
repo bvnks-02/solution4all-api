@@ -48,7 +48,30 @@ if (process.env.NODE_ENV !== "production") {
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Static file serving for uploads — mount at /uploads so /uploads/products/x.jpg works
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+const uploadsDir = path.join(__dirname, "uploads");
+app.use("/uploads", express.static(uploadsDir));
+
+// Explicit fallback: serve individual files (robust against express.static path issues)
+app.get("/uploads/products/:filename", (req, res) => {
+  const filePath = path.join(uploadsDir, "products", req.params.filename);
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).json({ success: false, message: "File not found" });
+  }
+});
+
+// Debug: list uploaded files (admin only — no auth for now, remove in production)
+app.get("/debug/uploads", (req, res) => {
+  const productsDir = path.join(uploadsDir, "products");
+  let files = [];
+  try {
+    files = fs.readdirSync(productsDir);
+  } catch (e) {
+    // dir doesn't exist
+  }
+  res.json({ uploadsDir, productsDir, files });
+});
 
 // Health check / root route — prevents 404 on "/" in production (Docker, load balancers)
 app.get("/", (req, res) => {
