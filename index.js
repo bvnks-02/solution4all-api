@@ -6,6 +6,7 @@ import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./src/config/swagger.js";
@@ -18,6 +19,16 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Ensure upload directories exist (Nixpacks/Coolify doesn't run our Dockerfile)
+const uploadDirs = ["uploads", "uploads/products", "uploads/category"];
+for (const dir of uploadDirs) {
+  const fullPath = path.join(__dirname, dir);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+    console.log(`Created directory: ${dir}`);
+  }
+}
 
 // CORS — allow all origins
 app.use(cors());
