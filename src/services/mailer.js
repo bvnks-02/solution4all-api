@@ -1,20 +1,16 @@
 import nodemailer from "nodemailer";
 import { smtpConfigModel } from "../../Database/models/smtpConfig.model.js";
 
-// Hardcoded fallback credentials (default)
-const DEFAULT_SMTP_HOST = "smtp.solution4all.dz";
-const DEFAULT_SMTP_PORT = 465;
-const DEFAULT_SMTP_SECURE = true;
-const DEFAULT_SMTP_USER = "websales@solution4all.dz";
-const DEFAULT_SMTP_PASS = "solutionadmin@2";
-const DEFAULT_SMTP_FROM = "websales@solution4all.dz";
+let transporter = null;
 
 export async function getTransporter() {
+  if (transporter) return transporter;
+
   try {
-    const activeConfig = await smtpConfigModel.findOne({ isActive: true });
+    const activeConfig = await smtpConfigModel.findOne({ isActive: true }).select("+password");
     if (activeConfig) {
       const secure = activeConfig.encryption === "SSL" || activeConfig.port === 465;
-      return nodemailer.createTransport({
+      transporter = nodemailer.createTransport({
         host: activeConfig.host,
         port: activeConfig.port,
         secure,
@@ -23,29 +19,35 @@ export async function getTransporter() {
           pass: activeConfig.password,
         },
       });
+      return transporter;
     }
   } catch (err) {
-    console.error("Failed to load active SMTP config from database, using defaults:", err.message);
+    console.error("Failed to load SMTP config from DB:", err.message);
   }
 
-  // Fallback if no configuration is found in database
-  return nodemailer.createTransport({
-    host: DEFAULT_SMTP_HOST,
-    port: DEFAULT_SMTP_PORT,
-    secure: DEFAULT_SMTP_SECURE,
+  // Fallback to env vars (dev/CI)
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.solution4all.dz",
+    port: Number(process.env.SMTP_PORT) || 465,
+    secure: process.env.SMTP_SECURE !== "false",
     auth: {
-      user: DEFAULT_SMTP_USER,
-      pass: DEFAULT_SMTP_PASS,
+      user: process.env.SMTP_USER || "websales@solution4all.dz",
+      pass: process.env.SMTP_PASS || "solutionadmin@2",
     },
   });
+  return transporter;
+}
+
+export function resetTransporter() {
+  transporter = null;
 }
 
 export async function sendMail({ to, subject, html, text }) {
   const mailTransporter = await getTransporter();
-  let from = DEFAULT_SMTP_FROM;
+  let from = process.env.SMTP_FROM || "websales@solution4all.dz";
 
   try {
-    const activeConfig = await smtpConfigModel.findOne({ isActive: true });
+    const activeConfig = await smtpConfigModel.findOne({ isActive: true }).select("+password");
     if (activeConfig && activeConfig.fromEmail) {
       from = activeConfig.fromEmail;
     }

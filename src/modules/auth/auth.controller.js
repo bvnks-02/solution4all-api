@@ -154,11 +154,15 @@ const forgotPassword = catchAsyncError(async (req, res, next) => {
 });
 
 const resetPassword = catchAsyncError(async (req, res, next) => {
-  const { token } = req.params;
-  const { password } = req.body;
+  const token = req.params.token || req.body.token;
+  const { password, new_password } = req.body;
+  const pw = new_password || password;
 
-  if (!password) {
+  if (!pw) {
     return next(new AppError("Password is required", 400));
+  }
+  if (!isStrongPassword(pw)) {
+    return next(new AppError("Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre", 400));
   }
 
   const user = await userModel.findOne({
@@ -170,23 +174,26 @@ const resetPassword = catchAsyncError(async (req, res, next) => {
     return next(new AppError("Token is invalid or has expired", 400));
   }
 
-  user.password = password;
+  user.password = pw;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpires = undefined;
   await user.save();
 
   res.status(200).json({
     success: true,
-    message: "Password reset successful. You can now log in.",
+    message: "Mot de passe mis à jour",
   });
 });
 
 const activateAccount = catchAsyncError(async (req, res, next) => {
-  const { token } = req.params;
+  const token = req.params.token || req.body.token;
   const { password } = req.body;
 
   if (!password) {
     return next(new AppError("Password is required to activate your account", 400));
+  }
+  if (!isStrongPassword(password)) {
+    return next(new AppError("Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre", 400));
   }
 
   const user = await userModel.findOne({
@@ -199,6 +206,7 @@ const activateAccount = catchAsyncError(async (req, res, next) => {
   }
 
   user.password = password;
+  user.is_active = true;
   user.status = "active";
   user.activationToken = undefined;
   user.activationTokenExpires = undefined;
@@ -210,4 +218,37 @@ const activateAccount = catchAsyncError(async (req, res, next) => {
   });
 });
 
-export { signIn, authRefresh, protectedRoutes, allowedTo, forgotPassword, resetPassword, activateAccount };
+// Password strength: min 8, 1 uppercase, 1 digit
+const isStrongPassword = (p) => /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(p);
+
+const getMe = catchAsyncError(async (req, res, next) => {
+  const user = await userModel.findById(req.user._id).select("-password");
+  if (!user) return next(new AppError("User not found", 404));
+  res.status(200).json({ success: true, data: user });
+});
+
+const changePassword = catchAsyncError(async (req, res, next) => {
+  const { current_password, new_password } = req.body;
+
+  if (!current_password || !new_password) {
+    return next(new AppError("Current password and new password are required", 400));
+  }
+  if (!isStrongPassword(new_password)) {
+    return next(new AppError("Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre", 400));
+  }
+
+  // ⚠️ SECURITY: must explicitly select password since it has select:false in some setups
+  const user = await userModel.findById(req.user._id);
+  if (!user) return next(new AppError("User not found", 404));
+
+  if (!user.correctPassword(current_password)) {
+    return next(new AppError("Mot de passe actuel incorrect", 401));
+  }
+
+  user.password = new_password;
+  await user.save();
+
+  res.status(200).json({ success: true, message: "Mot de passe mis à jour avec succès" });
+});
+
+export { signIn, authRefresh, protectedRoutes, allowedTo, forgotPassword, resetPassword, activateAccount, changePassword, getMe, isStrongPassword };

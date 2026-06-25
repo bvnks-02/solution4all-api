@@ -7,6 +7,8 @@ const smtpRouter = express.Router();
 smtpRouter
   .route("/")
   .get(protectedRoutes, allowedTo("admin"), smtpConfig.getSmtpConfig)
-  .post(protectedRoutes, allowedTo("admin"), smtpConfig.updateSmtpConfig);
+  .put(protectedRoutes, allowedTo("admin"), smtpConfig.updateSmtpConfig);
+
+smtpRouter.post("/test", protectedRoutes, allowedTo("admin"), smtpConfig.testSmtpConfig);
 
 export default smtpRouter;

@@ -139,6 +139,22 @@ const restoreProduct = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, data: product, message: "Product restored successfully" });
 });
 
+const hardDeleteProduct = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  // ⚠️ SECURITY: check for linked orders before permanent deletion
+  const { orderModel } = await import("../../../Database/models/order.model.js");
+  const hasOrders = await orderModel.exists({ "items.product_id": String(id) });
+  if (hasOrders) {
+    return next(new AppError(
+      "Ce produit est lié à des commandes existantes et ne peut pas être supprimé définitivement.",
+      409
+    ));
+  }
+  const product = await productModel.findByIdAndDelete(id);
+  if (!product) return next(new AppError("Product not found", 404));
+  res.status(200).json({ success: true, message: "Produit supprimé définitivement" });
+});
+
 export {
   addProduct,
   getAllProducts,
@@ -148,4 +164,5 @@ export {
   deleteProduct,
   getTrashedProducts,
   restoreProduct,
+  hardDeleteProduct,
 };

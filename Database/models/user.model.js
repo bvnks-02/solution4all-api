@@ -25,6 +25,10 @@ const userSchema = new Schema(
       enum: ["admin", "user"],
       default: "user",
     },
+    is_active: {
+      type: Boolean,
+      default: true,
+    },
     status: {
       type: String,
       enum: ["pending", "active"],

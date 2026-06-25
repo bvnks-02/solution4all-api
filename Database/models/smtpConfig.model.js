@@ -19,6 +19,7 @@ const smtpConfigSchema = new Schema(
     password: {
       type: String,
       required: true,
+      select: false, // ⚠️ SECURITY: never leak in queries
     },
     encryption: {
       type: String,
@@ -37,5 +38,9 @@ const smtpConfigSchema = new Schema(
   },
   { timestamps: true }
 );
+
+smtpConfigSchema.statics.getConfig = function () {
+  return this.findOne({ isActive: true }).select("+password");
+};
 
 export const smtpConfigModel = model("SmtpConfig", smtpConfigSchema);
