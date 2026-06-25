@@ -19,19 +19,27 @@ const userSchema = new Schema(
     },
     password: {
       type: String,
-      required: true,
     },
     role: {
       type: String,
-      enum: ["admin"],
-      default: "admin",
+      enum: ["admin", "user"],
+      default: "user",
     },
+    status: {
+      type: String,
+      enum: ["pending", "active"],
+      default: "active",
+    },
+    activationToken: String,
+    activationTokenExpires: Date,
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
   },
   { timestamps: true }
 );
 
 userSchema.pre("save", function () {
-  if (this.isModified("password")) {
+  if (this.isModified("password") && this.password) {
     this.password = bcrypt.hashSync(this.password, SALT_ROUNDS);
   }
 });
@@ -43,6 +51,7 @@ userSchema.pre("findOneAndUpdate", function () {
 });
 
 userSchema.methods.correctPassword = function (candidatePassword) {
+  if (!this.password) return false;
   return bcrypt.compareSync(candidatePassword, this.password);
 };
 

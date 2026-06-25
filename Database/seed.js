@@ -255,6 +255,7 @@ async function seed() {
       email: "admin@solution4all.dz",
       password: "admin123456",
       role: "admin",
+      status: "active",
     });
     console.log(`Admin user created: ${adminUser.email}`);
 

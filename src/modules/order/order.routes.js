@@ -8,13 +8,13 @@ const orderRouter = express.Router();
 // Public: create order (rate limited)
 orderRouter.post("/", orderLimiter, order.createOrder);
 
-// Admin: list all orders
-orderRouter.get("/", protectedRoutes, allowedTo("admin"), order.getAllOrders);
+// Admin/User: list all orders
+orderRouter.get("/", protectedRoutes, allowedTo("admin", "user"), order.getAllOrders);
 
-// Admin: get/update specific order
+// Admin/User: get/update specific order
 orderRouter
   .route("/:id")
-  .get(protectedRoutes, allowedTo("admin"), order.getSpecificOrder)
-  .patch(protectedRoutes, allowedTo("admin"), order.updateOrder);
+  .get(protectedRoutes, allowedTo("admin", "user"), order.getSpecificOrder)
+  .patch(protectedRoutes, allowedTo("admin", "user"), order.updateOrder);
 
 export default orderRouter;

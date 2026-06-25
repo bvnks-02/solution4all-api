@@ -11,7 +11,7 @@ productRouter
   .route("/")
   .post(
     protectedRoutes,
-    allowedTo("admin"),
+    allowedTo("admin", "user"),
     uploadMultipleFiles(uploadFields, "products"),
     product.addProduct
   )
@@ -19,12 +19,15 @@ productRouter
 
 productRouter.get("/slug/:slug", product.getProductBySlug);
 
+productRouter.get("/trash", protectedRoutes, allowedTo("admin"), product.getTrashedProducts);
+productRouter.patch("/restore/:id", protectedRoutes, allowedTo("admin"), product.restoreProduct);
+
 productRouter
   .route("/:id")
   .get(product.getSpecificProduct)
   .put(
     protectedRoutes,
-    allowedTo("admin"),
+    allowedTo("admin", "user"),
     uploadMultipleFiles(uploadFields, "products"),
     product.updateProduct
   )

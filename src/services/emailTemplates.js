@@ -91,17 +91,12 @@ export function orderNotificationEmail(order) {
 }
 
 export function contactRoutingEmail(submission) {
-  const departmentEmails = {
-    general: "contact@solution4all.dz",
-    commercial: "commercial@solution4all.dz",
-    ecommerce: "e-commerce@solution4all.dz",
-    technical: "technique@solution4all.dz",
-  };
-
-  const to = departmentEmails[submission.department] || departmentEmails.general;
+  // All contact emails go to websales — the only verified working mailbox
+  const to = "websales@solution4all.dz";
 
   return {
     to,
+    // Department info is preserved in the email body for manual routing
     subject: `Nouveau message de contact: ${submission.subject}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -119,3 +114,44 @@ export function contactRoutingEmail(submission) {
       </div>`,
   };
 }
+
+export function accountActivationEmail(activationUrl, name) {
+  return {
+    subject: "Activation de votre compte Solution4All",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6;">
+        <h2 style="color: #2563eb;">Bienvenue sur Solution4All !</h2>
+        <p>Bonjour ${name},</p>
+        <p>Un compte a été créé pour vous sur la plateforme Solution4All par un administrateur.</p>
+        <p>Pour pouvoir vous connecter et définir votre mot de passe, veuillez cliquer sur le lien ci-dessous :</p>
+        <p style="margin: 24px 0;">
+          <a href="${activationUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Activer mon compte</a>
+        </p>
+        <p>Ce lien est valable pour une durée de 48 heures.</p>
+        <p>Si le bouton ci-dessus ne fonctionne pas, copiez-collez l'adresse suivante dans votre navigateur :</p>
+        <p style="word-break: break-all; color: #6b7280;">${activationUrl}</p>
+        <p>Cordialement,<br>L'équipe Solution4All</p>
+      </div>`,
+  };
+}
+
+export function passwordResetEmail(resetUrl, name) {
+  return {
+    subject: "Réinitialisation de votre mot de passe Solution4All",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6;">
+        <h2 style="color: #2563eb;">Demande de réinitialisation de mot de passe</h2>
+        <p>Bonjour ${name || ""},</p>
+        <p>Vous recevez cet e-mail car vous (ou quelqu'un d'autre) avez demandé la réinitialisation du mot de passe de votre compte.</p>
+        <p>Veuillez cliquer sur le lien ci-dessous pour définir un nouveau mot de passe :</p>
+        <p style="margin: 24px 0;">
+          <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Réinitialiser mon mot de passe</a>
+        </p>
+        <p>Ce lien est valable pour une durée d'une heure. Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet e-mail.</p>
+        <p>Si le bouton ci-dessus ne fonctionne pas, copiez-collez l'adresse suivante dans votre navigateur :</p>
+        <p style="word-break: break-all; color: #6b7280;">${resetUrl}</p>
+        <p>Cordialement,<br>L'équipe Solution4All</p>
+      </div>`,
+  };
+}
+

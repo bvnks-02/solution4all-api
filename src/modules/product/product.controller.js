@@ -23,7 +23,7 @@ const addProduct = catchAsyncError(async (req, res, next) => {
 });
 
 const getAllProducts = catchAsyncError(async (req, res, next) => {
-  const query = {};
+  const query = { deletedAt: null };
   if (req.query.category) query.category = req.query.category;
   if (req.query.active !== undefined) query.active = req.query.active === "true";
   if (req.query.featured !== undefined) query.featured = req.query.featured === "true";
@@ -41,7 +41,7 @@ const getAllProducts = catchAsyncError(async (req, res, next) => {
 
 const getProductBySlug = catchAsyncError(async (req, res, next) => {
   const { slug } = req.params;
-  const product = await productModel.findOne({ slug });
+  const product = await productModel.findOne({ slug, deletedAt: null });
 
   if (!product) {
     return next(new AppError("Product not found", 404));
@@ -52,7 +52,7 @@ const getProductBySlug = catchAsyncError(async (req, res, next) => {
 
 const getSpecificProduct = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const product = await productModel.findById(id);
+  const product = await productModel.findOne({ _id: id, deletedAt: null });
 
   if (!product) {
     return next(new AppError("Product not found", 404));
@@ -104,13 +104,39 @@ const updateProduct = catchAsyncError(async (req, res, next) => {
 
 const deleteProduct = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const product = await productModel.findByIdAndDelete(id);
+  const product = await productModel.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
 
   if (!product) {
     return next(new AppError("Product not found", 404));
   }
 
-  res.status(200).json({ success: true, message: "Product deleted successfully" });
+  res.status(200).json({ success: true, message: "Product moved to trash successfully" });
+});
+
+const getTrashedProducts = catchAsyncError(async (req, res, next) => {
+  const query = { deletedAt: { $ne: null } };
+  if (req.query.category) query.category = req.query.category;
+  if (req.query.search) {
+    const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    query.$or = [
+      { name_fr: { $regex: escaped, $options: "i" } },
+      { description_fr: { $regex: escaped, $options: "i" } },
+    ];
+  }
+  const sort = parseSort(req.query.sort);
+  const { items, meta } = await paginate(productModel, query, { ...req.query, sort });
+  res.status(200).json({ success: true, data: items, meta });
+});
+
+const restoreProduct = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const product = await productModel.findByIdAndUpdate(id, { deletedAt: null }, { new: true });
+
+  if (!product) {
+    return next(new AppError("Product not found", 404));
+  }
+
+  res.status(200).json({ success: true, data: product, message: "Product restored successfully" });
 });
 
 export {
@@ -120,4 +146,6 @@ export {
   getSpecificProduct,
   updateProduct,
   deleteProduct,
+  getTrashedProducts,
+  restoreProduct,
 };

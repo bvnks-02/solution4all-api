@@ -93,7 +93,7 @@ const createOrder = catchAsyncError(async (req, res, next) => {
   // Send notification emails (non-blocking)
   const notificationEmail = orderNotificationEmail(order);
   sendMail({
-    to: process.env.ORDER_EMAIL || "e-commerce@solution4all.dz",
+    to: process.env.ORDER_EMAIL || "websales@solution4all.dz",
     subject: notificationEmail.subject,
     html: notificationEmail.html,
   }).catch((err) => console.error("Failed to send order notification:", err.message));

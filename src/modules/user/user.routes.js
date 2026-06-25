@@ -6,7 +6,10 @@ const userRouter = express.Router();
 
 userRouter
   .route("/")
-  .get(protectedRoutes, allowedTo("admin"), User.getAllUsers);
+  .get(protectedRoutes, allowedTo("admin"), User.getAllUsers)
+  .post(protectedRoutes, allowedTo("admin"), User.createUser);
+
+userRouter.patch("/change-my-password", protectedRoutes, User.changeMyPassword);
 
 userRouter
   .route("/:id")

@@ -6,13 +6,13 @@ const serviceRouter = express.Router();
 
 serviceRouter
   .route("/")
-  .post(protectedRoutes, allowedTo("admin"), service.addService)
+  .post(protectedRoutes, allowedTo("admin", "user"), service.addService)
   .get(service.getAllServices);
 
 serviceRouter
   .route("/:id")
   .get(service.getSpecificService)
-  .put(protectedRoutes, allowedTo("admin"), service.updateService)
+  .put(protectedRoutes, allowedTo("admin", "user"), service.updateService)
   .delete(protectedRoutes, allowedTo("admin"), service.deleteService);
 
 export default serviceRouter;
