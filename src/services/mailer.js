@@ -9,11 +9,13 @@ export async function getTransporter() {
   try {
     const activeConfig = await smtpConfigModel.findOne({ isActive: true }).select("+password");
     if (activeConfig) {
-      const secure = activeConfig.encryption === "SSL" || activeConfig.port === 465;
+      const secure = activeConfig.encryption === "SSL";
+      const requireTLS = activeConfig.encryption === "TLS";
       transporter = nodemailer.createTransport({
         host: activeConfig.host,
         port: activeConfig.port,
-        secure,
+        secure,          // true only for SSL (port 465 implicit)
+        requireTLS,      // STARTTLS for TLS (port 587)
         auth: {
           user: activeConfig.username,
           pass: activeConfig.password,

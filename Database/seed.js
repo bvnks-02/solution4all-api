@@ -256,6 +256,7 @@ async function seed() {
       password: "admin123456",
       role: "admin",
       status: "active",
+      is_active: true,
     });
     console.log(`Admin user created: ${adminUser.email}`);
 

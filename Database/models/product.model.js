@@ -75,5 +75,6 @@ const productSchema = new Schema(
 productSchema.index({ slug: 1 });
 productSchema.index({ category: 1, active: 1 });
 productSchema.index({ featured: -1, name_fr: 1 });
+productSchema.index({ deletedAt: 1 }, { sparse: true });
 
 export const productModel = model("Product", productSchema);

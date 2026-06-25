@@ -29,7 +29,8 @@ const verifyToken = (req) => {
 const signIn = catchAsyncError(async (req, res, next) => {
   const { email, password } = req.body;
 
-  const user = await userModel.findOne({ email });
+  // ⚠️ SECURITY: password has select:false — must explicitly include it
+  const user = await userModel.findOne({ email }).select("+password");
   if (!user || !user.correctPassword(password)) {
     return next(new AppError("Invalid email or password", 401));
   }
@@ -118,6 +119,10 @@ const allowedTo = (...roles) => {
   });
 };
 
+// Reset tokens are stored on the User document (resetPasswordToken + resetPasswordExpires)
+// rather than in a separate collection — simpler, no join needed, and the TTL is enforced
+// by the expires field check in resetPassword. The dedicated passwordResetToken model was
+// intentionally removed as dead code in favor of this approach.
 const forgotPassword = catchAsyncError(async (req, res, next) => {
   const { email } = req.body;
 
@@ -126,30 +131,28 @@ const forgotPassword = catchAsyncError(async (req, res, next) => {
   }
 
   const user = await userModel.findOne({ email });
-  if (!user) {
-    return next(new AppError("No user found with that email address", 404));
+
+  // ⚠️ SECURITY: always return 200 — never reveal if email is registered (prevents enumeration)
+  if (user) {
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    const emailContent = passwordResetEmail(resetUrl, user.name);
+    await sendMail({
+      to: user.email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+    });
   }
-
-  // Generate the random reset token
-  const resetToken = crypto.randomBytes(32).toString("hex");
-  user.resetPasswordToken = resetToken;
-  user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
-  await user.save();
-
-  // Send reset email
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-  const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
-  
-  const emailContent = passwordResetEmail(resetUrl, user.name);
-  await sendMail({
-    to: user.email,
-    subject: emailContent.subject,
-    html: emailContent.html,
-  });
 
   res.status(200).json({
     success: true,
-    message: "Password reset link sent to your email address",
+    message: "Si un compte correspond à cet email, un lien de réinitialisation a été envoyé.",
   });
 });
 
@@ -237,8 +240,8 @@ const changePassword = catchAsyncError(async (req, res, next) => {
     return next(new AppError("Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre", 400));
   }
 
-  // ⚠️ SECURITY: must explicitly select password since it has select:false in some setups
-  const user = await userModel.findById(req.user._id);
+  // ⚠️ SECURITY: password has select:false — must explicitly include it
+  const user = await userModel.findById(req.user._id).select("+password");
   if (!user) return next(new AppError("User not found", 404));
 
   if (!user.correctPassword(current_password)) {

@@ -19,6 +19,7 @@ const userSchema = new Schema(
     },
     password: {
       type: String,
+      select: false, // ⚠️ SECURITY: never leak in queries
     },
     role: {
       type: String,

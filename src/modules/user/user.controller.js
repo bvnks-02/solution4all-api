@@ -120,7 +120,8 @@ const changeMyPassword = catchAsyncError(async (req, res, next) => {
     return next(new AppError("Current password and new password are required", 400));
   }
 
-  const user = await userModel.findById(req.user.id);
+  // ⚠️ SECURITY: password has select:false — must explicitly include it
+  const user = await userModel.findById(req.user.id).select("+password");
   if (!user) {
     return next(new AppError("User not found", 404));
   }
