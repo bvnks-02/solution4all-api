@@ -31,6 +31,11 @@ const getAllSubmissions = catchAsyncError(async (req, res, next) => {
   const query = {};
   if (req.query.status) query.status = req.query.status;
   if (req.query.department) query.department = req.query.department;
+  if (req.query.dateFrom || req.query.dateTo) {
+    query.createdAt = {};
+    if (req.query.dateFrom) query.createdAt.$gte = new Date(req.query.dateFrom);
+    if (req.query.dateTo) query.createdAt.$lte = new Date(req.query.dateTo);
+  }
   if (req.query.search) {
     const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     query.$or = [
