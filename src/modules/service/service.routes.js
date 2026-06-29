@@ -13,6 +13,7 @@ serviceRouter
   .route("/:id")
   .get(service.getSpecificService)
   .put(protectedRoutes, allowedTo("admin", "user"), service.updateService)
+  .patch(protectedRoutes, allowedTo("admin", "user"), service.updateService)
   .delete(protectedRoutes, allowedTo("admin"), service.deleteService);
 
 export default serviceRouter;
