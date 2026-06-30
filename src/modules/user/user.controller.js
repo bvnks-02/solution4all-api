@@ -1,9 +1,6 @@
 import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
 import { userModel } from "../../../Database/models/user.model.js";
-import crypto from "crypto";
-import { sendMail } from "../../services/mailer.js";
-import { accountActivationEmail } from "../../services/emailTemplates.js";
 
 const getAllUsers = catchAsyncError(async (req, res, next) => {
   const users = await userModel.find().select("-password");
@@ -68,10 +65,10 @@ const changePassword = catchAsyncError(async (req, res, next) => {
 });
 
 const createUser = catchAsyncError(async (req, res, next) => {
-  const { name, email, role } = req.body;
+  const { name, email, role, password } = req.body;
 
-  if (!email || !name) {
-    return next(new AppError("Name and Email are required fields", 400));
+  if (!email || !name || !password) {
+    return next(new AppError("Name, Email and Password are required fields", 400));
   }
 
   const existingUser = await userModel.findOne({ email });
@@ -79,26 +76,13 @@ const createUser = catchAsyncError(async (req, res, next) => {
     return next(new AppError("User with this email already exists", 400));
   }
 
-  const activationToken = crypto.randomBytes(32).toString("hex");
-  const activationTokenExpires = Date.now() + 48 * 60 * 60 * 1000; // 48 hours
-
+  // Admin-created members are active immediately — no activation email/invitation.
   const user = await userModel.create({
     name,
     email,
+    password,
     role: role || "user",
-    status: "pending",
-    activationToken,
-    activationTokenExpires,
-  });
-
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-  const activationUrl = `${frontendUrl}/activate-account/${activationToken}`;
-
-  const emailContent = accountActivationEmail(activationUrl, user.name);
-  await sendMail({
-    to: user.email,
-    subject: emailContent.subject,
-    html: emailContent.html,
+    status: "active",
   });
 
   res.status(201).json({

@@ -2,6 +2,7 @@ import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
 import { parseSort } from "../../utils/parseSort.js";
 import { paginate } from "../../utils/paginate.js";
+import { buildSearchRegex } from "../../utils/searchRegex.js";
 import { contactSubmissionModel } from "../../../Database/models/contactSubmission.model.js";
 import { sendMail } from "../../services/mailer.js";
 import { contactRoutingEmail } from "../../services/emailTemplates.js";
@@ -37,11 +38,11 @@ const getAllSubmissions = catchAsyncError(async (req, res, next) => {
     if (req.query.dateTo) query.createdAt.$lte = new Date(req.query.dateTo);
   }
   if (req.query.search) {
-    const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = buildSearchRegex(req.query.search);
     query.$or = [
-      { full_name: { $regex: escaped, $options: "i" } },
-      { email: { $regex: escaped, $options: "i" } },
-      { subject: { $regex: escaped, $options: "i" } },
+      { full_name: regex },
+      { email: regex },
+      { subject: regex },
     ];
   }
   const sort = parseSort(req.query.sort);

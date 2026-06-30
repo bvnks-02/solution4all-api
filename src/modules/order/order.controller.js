@@ -2,6 +2,7 @@ import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
 import { parseSort } from "../../utils/parseSort.js";
 import { paginate } from "../../utils/paginate.js";
+import { buildSearchRegex } from "../../utils/searchRegex.js";
 import { productModel } from "../../../Database/models/product.model.js";
 import { orderModel } from "../../../Database/models/order.model.js";
 import { sendMail } from "../../services/mailer.js";
@@ -111,6 +112,15 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 const getAllOrders = catchAsyncError(async (req, res, next) => {
   const query = {};
   if (req.query.status) query.status = req.query.status;
+  if (req.query.search) {
+    const regex = buildSearchRegex(req.query.search);
+    query.$or = [
+      { order_number: regex },
+      { customer_name: regex },
+      { customer_email: regex },
+      { customer_company: regex },
+    ];
+  }
   const sort = parseSort(req.query.sort);
   const { items, meta } = await paginate(orderModel, query, { ...req.query, sort });
   res.status(200).json({ success: true, data: items, meta });

@@ -3,6 +3,7 @@ import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import { AppError } from "../../utils/AppError.js";
 import { parseSort } from "../../utils/parseSort.js";
 import { paginate } from "../../utils/paginate.js";
+import { buildSearchRegex } from "../../utils/searchRegex.js";
 import { productModel } from "../../../Database/models/product.model.js";
 
 const addProduct = catchAsyncError(async (req, res, next) => {
@@ -28,10 +29,13 @@ const getAllProducts = catchAsyncError(async (req, res, next) => {
   if (req.query.active !== undefined) query.active = req.query.active === "true";
   if (req.query.featured !== undefined) query.featured = req.query.featured === "true";
   if (req.query.search) {
-    const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = buildSearchRegex(req.query.search);
     query.$or = [
-      { name_fr: { $regex: escaped, $options: "i" } },
-      { description_fr: { $regex: escaped, $options: "i" } },
+      { name_fr: regex },
+      { description_fr: regex },
+      { category: regex },
+      { sku: regex },
+      { brand: regex },
     ];
   }
   const sort = parseSort(req.query.sort);
@@ -117,10 +121,13 @@ const getTrashedProducts = catchAsyncError(async (req, res, next) => {
   const query = { deletedAt: { $ne: null } };
   if (req.query.category) query.category = req.query.category;
   if (req.query.search) {
-    const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = buildSearchRegex(req.query.search);
     query.$or = [
-      { name_fr: { $regex: escaped, $options: "i" } },
-      { description_fr: { $regex: escaped, $options: "i" } },
+      { name_fr: regex },
+      { description_fr: regex },
+      { category: regex },
+      { sku: regex },
+      { brand: regex },
     ];
   }
   const sort = parseSort(req.query.sort);
