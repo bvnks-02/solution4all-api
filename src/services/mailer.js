@@ -3,24 +3,41 @@ import { smtpConfigModel } from "../../Database/models/smtpConfig.model.js";
 
 let transporter = null;
 
+/**
+ * Builds nodemailer transport options from an SMTP config, deriving `secure`
+ * from the PORT (not just the encryption label). Port 465 is implicit TLS and
+ * MUST be `secure: true`; 587/25 use STARTTLS. Getting this wrong makes the
+ * connection hang or silently misbehave, which is the classic "test says sent
+ * but nothing arrives" failure.
+ */
+function buildTransportOptions({ host, port, username, password, encryption }) {
+  const numericPort = Number(port);
+  const secure = encryption === "SSL" || numericPort === 465;
+  const requireTLS = !secure && encryption === "TLS";
+  return {
+    host,
+    port: numericPort,
+    secure,
+    requireTLS,
+    auth: { user: username, pass: password },
+  };
+}
+
 export async function getTransporter() {
   if (transporter) return transporter;
 
   try {
     const activeConfig = await smtpConfigModel.findOne({ isActive: true }).select("+password");
     if (activeConfig) {
-      const secure = activeConfig.encryption === "SSL";
-      const requireTLS = activeConfig.encryption === "TLS";
-      transporter = nodemailer.createTransport({
-        host: activeConfig.host,
-        port: activeConfig.port,
-        secure,          // true only for SSL (port 465 implicit)
-        requireTLS,      // STARTTLS for TLS (port 587)
-        auth: {
-          user: activeConfig.username,
-          pass: activeConfig.password,
-        },
-      });
+      transporter = nodemailer.createTransport(
+        buildTransportOptions({
+          host: activeConfig.host,
+          port: activeConfig.port,
+          username: activeConfig.username,
+          password: activeConfig.password,
+          encryption: activeConfig.encryption,
+        }),
+      );
       return transporter;
     }
   } catch (err) {
@@ -52,23 +69,31 @@ export function resetTransporter() {
  */
 export async function sendTestMail(config, to) {
   const { host, port, username, password, encryption, fromEmail } = config;
-  const secure = encryption === "SSL";
-  const requireTLS = encryption === "TLS";
 
-  const testTransporter = nodemailer.createTransport({
-    host,
-    port: Number(port),
-    secure,
-    requireTLS,
-    auth: { user: username, pass: password },
-  });
+  const testTransporter = nodemailer.createTransport(
+    buildTransportOptions({ host, port, username, password, encryption }),
+  );
 
-  return testTransporter.sendMail({
+  // Validate connection + authentication up front so a wrong host/port/password
+  // surfaces as a real error instead of a false "sent" success.
+  await testTransporter.verify();
+
+  const info = await testTransporter.sendMail({
     from: fromEmail || username,
     to,
     subject: "Test de configuration SMTP — Solution4All",
     html: `<div style="font-family:Arial;padding:20px"><h2 style="color:#1C3F7A">Test SMTP réussi</h2><p>Ce message confirme que votre configuration SMTP fonctionne correctement.</p><p>— Solution4All</p></div>`,
   });
+
+  // The server can accept the connection but refuse the recipient (relay denied,
+  // unknown mailbox). Treat that as a failure so the admin isn't told it worked.
+  if (info.rejected?.length || !info.accepted?.length) {
+    throw new Error(
+      `le serveur a refusé le destinataire ${to}${info.response ? ` (${info.response})` : ""}`,
+    );
+  }
+
+  return info;
 }
 
 export async function sendMail({ to, subject, html, text }) {
