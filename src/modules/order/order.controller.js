@@ -111,6 +111,10 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 
 const getAllOrders = catchAsyncError(async (req, res, next) => {
   const query = {};
+  // Hide archived orders from the active list unless explicitly requested
+  // (?archived=true returns only the archive view). Use $ne:true for the active
+  // view so legacy orders (created before this field existed) still appear.
+  query.archived = req.query.archived === "true" ? true : { $ne: true };
   if (req.query.status) query.status = req.query.status;
   if (req.query.search) {
     const regex = buildSearchRegex(req.query.search);
@@ -139,11 +143,15 @@ const getSpecificOrder = catchAsyncError(async (req, res, next) => {
 
 const updateOrder = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const { status, admin_notes } = req.body;
+  const { status, admin_notes, archived } = req.body;
 
   const updateData = {};
   if (status) updateData.status = status;
   if (admin_notes !== undefined) updateData.admin_notes = admin_notes;
+  if (archived !== undefined) {
+    updateData.archived = !!archived;
+    updateData.archivedAt = archived ? new Date() : null;
+  }
 
   const order = await orderModel.findByIdAndUpdate(id, updateData, { new: true });
 

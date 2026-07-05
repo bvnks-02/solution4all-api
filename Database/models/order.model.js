@@ -86,6 +86,14 @@ const orderSchema = new Schema(
       trim: true,
       default: "",
     },
+    archived: {
+      type: Boolean,
+      default: false,
+    },
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -93,5 +101,6 @@ const orderSchema = new Schema(
 orderSchema.index({ order_number: 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ customer_email: 1 });
+orderSchema.index({ archived: 1 });
 
 export const orderModel = model("Order", orderSchema);
