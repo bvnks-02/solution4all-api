@@ -4,7 +4,8 @@ import { catchAsyncError } from "../../utils/catchAsyncError.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { sendMail } from "../../services/mailer.js";
-import { passwordResetEmail, accountActivationEmail } from "../../services/emailTemplates.js";
+import { passwordResetEmail, accountActivationEmail, adminLoginNotificationEmail } from "../../services/emailTemplates.js";
+import { smtpConfigModel } from "../../../Database/models/smtpConfig.model.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "solution4all-dev-secret";
 
@@ -254,4 +255,48 @@ const changePassword = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, message: "Mot de passe mis à jour avec succès" });
 });
 
-export { signIn, authRefresh, protectedRoutes, allowedTo, forgotPassword, resetPassword, activateAccount, changePassword, getMe, isStrongPassword };
+// Sends an admin login notification email with login time, IP, and user agent.
+// Called by the frontend right after a successful admin sign-in. Fire-and-forget
+// from the caller's perspective, but here we return 200/500 so the caller can
+// log the outcome. Only works for admin users.
+const sendLoginNotification = catchAsyncError(async (req, res, next) => {
+  const user = req.user;
+  if (!user) {
+    return next(new AppError("Authentication required", 401));
+  }
+  if (user.role !== "admin") {
+    return next(new AppError("Only admin logins trigger notifications", 403));
+  }
+
+  const loginTime = new Date().toISOString();
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || req.ip;
+  const userAgent = req.headers["user-agent"] || "Inconnu";
+
+  const emailContent = adminLoginNotificationEmail({
+    name: user.name,
+    email: user.email,
+    loginTime,
+    ip,
+    userAgent,
+  });
+
+  // Send to the configured fromEmail (notification address). sendMail handles
+  // fetching the active SMTP config and falls back to env vars if needed.
+  let to = process.env.SMTP_FROM || "websales@solution4all.dz";
+  try {
+    const activeConfig = await smtpConfigModel.findOne({ isActive: true });
+    if (activeConfig && activeConfig.fromEmail) to = activeConfig.fromEmail;
+  } catch {
+    // fall back to env default
+  }
+
+  await sendMail({
+    to,
+    subject: emailContent.subject,
+    html: emailContent.html,
+  });
+
+  res.status(200).json({ success: true, message: `Notification de connexion envoyée à ${to}` });
+});
+
+export { signIn, authRefresh, protectedRoutes, allowedTo, forgotPassword, resetPassword, activateAccount, changePassword, getMe, isStrongPassword, sendLoginNotification };

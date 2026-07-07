@@ -14,5 +14,6 @@ authRouter.post("/activate-account/:token", auth.activateAccount);
 authRouter.post("/reset-password", auth.resetPassword);
 authRouter.post("/activate-account", auth.activateAccount);
 authRouter.patch("/change-password", protectedRoutes, auth.changePassword);
+authRouter.post("/login-notification", protectedRoutes, auth.sendLoginNotification);
 
 export default authRouter;

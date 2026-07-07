@@ -135,6 +135,26 @@ export function accountActivationEmail(activationUrl, name) {
   };
 }
 
+export function adminLoginNotificationEmail({ name, email, loginTime, ip, userAgent }) {
+  return {
+    subject: `Connexion admin — ${name} (${email})`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; line-height: 1.6;">
+        <h2 style="color: #b91c1c;">Connexion administrateur détectée</h2>
+        <p>Une connexion à un compte administrateur vient d'avoir lieu sur la plateforme Solution4All.</p>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr><td style="padding: 4px 8px; font-weight: bold; width: 140px;">Administrateur:</td><td style="padding: 4px 8px;">${name}</td></tr>
+          <tr><td style="padding: 4px 8px; font-weight: bold;">Email:</td><td style="padding: 4px 8px;">${email}</td></tr>
+          <tr><td style="padding: 4px 8px; font-weight: bold;">Date / heure:</td><td style="padding: 4px 8px;">${loginTime}</td></tr>
+          <tr><td style="padding: 4px 8px; font-weight: bold;">Adresse IP:</td><td style="padding: 4px 8px;">${ip || "Inconnue"}</td></tr>
+          <tr><td style="padding: 4px 8px; font-weight: bold;">User-Agent:</td><td style="padding: 4px 8px; word-break: break-all;">${userAgent || "Inconnu"}</td></tr>
+        </table>
+        <p style="margin-top: 16px; color: #6b7280;">Si vous êtes à l'origine de cette connexion, aucune action n'est requise. Sinon, vérifiez immédiatement le compte.</p>
+        <p>Cordialement,<br>L'équipe Solution4All</p>
+      </div>`,
+  };
+}
+
 export function passwordResetEmail(resetUrl, name) {
   return {
     subject: "Réinitialisation de votre mot de passe Solution4All",
