@@ -110,7 +110,7 @@ const createOrder = catchAsyncError(async (req, res, next) => {
 });
 
 const getAllOrders = catchAsyncError(async (req, res, next) => {
-  const query = {};
+  const query = { deletedAt: null };
   // Hide archived orders from the active list unless explicitly requested
   // (?archived=true returns only the archive view). Use $ne:true for the active
   // view so legacy orders (created before this field existed) still appear.
@@ -162,4 +162,41 @@ const updateOrder = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, data: order });
 });
 
-export { createOrder, getAllOrders, getSpecificOrder, updateOrder };
+const deleteOrder = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const order = await orderModel.findByIdAndUpdate(id, { deletedAt: new Date() }, { new: true });
+  if (!order) return next(new AppError("Order not found", 404));
+  res.status(200).json({ success: true, message: "Commande déplacée dans la corbeille" });
+});
+
+const getTrashedOrders = catchAsyncError(async (req, res, next) => {
+  const query = { deletedAt: { $ne: null } };
+  if (req.query.status) query.status = req.query.status;
+  if (req.query.search) {
+    const regex = buildSearchRegex(req.query.search);
+    query.$or = [
+      { order_number: regex },
+      { customer_name: regex },
+      { customer_email: regex },
+    ];
+  }
+  const sort = parseSort(req.query.sort);
+  const { items, meta } = await paginate(orderModel, query, { ...req.query, sort });
+  res.status(200).json({ success: true, data: items, meta });
+});
+
+const restoreOrder = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const order = await orderModel.findByIdAndUpdate(id, { deletedAt: null }, { new: true });
+  if (!order) return next(new AppError("Order not found", 404));
+  res.status(200).json({ success: true, data: order, message: "Commande restaurée avec succès" });
+});
+
+const hardDeleteOrder = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const order = await orderModel.findByIdAndDelete(id);
+  if (!order) return next(new AppError("Order not found", 404));
+  res.status(200).json({ success: true, message: "Commande supprimée définitivement" });
+});
+
+export { createOrder, getAllOrders, getSpecificOrder, updateOrder, deleteOrder, getTrashedOrders, restoreOrder, hardDeleteOrder };

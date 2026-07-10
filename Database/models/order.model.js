@@ -94,6 +94,10 @@ const orderSchema = new Schema(
       type: Date,
       default: null,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -102,5 +106,6 @@ orderSchema.index({ order_number: 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ customer_email: 1 });
 orderSchema.index({ archived: 1 });
+orderSchema.index({ deletedAt: 1 });
 
 export const orderModel = model("Order", orderSchema);

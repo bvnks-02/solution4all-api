@@ -35,4 +35,20 @@ const getEventCount = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, data: { count } });
 });
 
-export { createEvent, getAllEvents, getEventCount };
+const deleteEvent = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const event = await analyticsEventModel.findByIdAndDelete(id);
+  if (!event) return next(new AppError("Event not found", 404));
+  res.status(200).json({ success: true, message: "Événement supprimé avec succès" });
+});
+
+const purgeAllEvents = catchAsyncError(async (req, res, next) => {
+  const result = await analyticsEventModel.deleteMany({});
+  res.status(200).json({
+    success: true,
+    message: `${result.deletedCount} événement(s) supprimé(s)`,
+    data: { deletedCount: result.deletedCount },
+  });
+});
+
+export { createEvent, getAllEvents, getEventCount, deleteEvent, purgeAllEvents };

@@ -22,6 +22,7 @@ productRouter.get("/slug/:slug", product.getProductBySlug);
 productRouter.get("/trash", protectedRoutes, allowedTo("admin"), product.getTrashedProducts);
 productRouter.patch("/:id/restore", protectedRoutes, allowedTo("admin"), product.restoreProduct);
 productRouter.delete("/:id/hard", protectedRoutes, allowedTo("admin"), product.hardDeleteProduct);
+productRouter.delete("/:id/force", protectedRoutes, allowedTo("admin"), product.forceDeleteProduct);
 
 productRouter
   .route("/:id")

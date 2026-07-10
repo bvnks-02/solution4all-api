@@ -162,6 +162,13 @@ const hardDeleteProduct = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ success: true, message: "Produit supprimé définitivement" });
 });
 
+const forceDeleteProduct = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  const product = await productModel.findByIdAndDelete(id);
+  if (!product) return next(new AppError("Product not found", 404));
+  res.status(200).json({ success: true, message: "Produit supprimé définitivement (forcé)" });
+});
+
 export {
   addProduct,
   getAllProducts,
@@ -172,4 +179,5 @@ export {
   getTrashedProducts,
   restoreProduct,
   hardDeleteProduct,
+  forceDeleteProduct,
 };

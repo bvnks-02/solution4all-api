@@ -12,4 +12,8 @@ analyticsRouter.post("/", analyticsLimiter, analytics.createEvent);
 analyticsRouter.get("/count", protectedRoutes, allowedTo("admin", "user"), analytics.getEventCount);
 analyticsRouter.get("/", protectedRoutes, allowedTo("admin", "user"), analytics.getAllEvents);
 
+// Admin: delete individual event and purge all events
+analyticsRouter.delete("/purge", protectedRoutes, allowedTo("admin"), analytics.purgeAllEvents);
+analyticsRouter.delete("/:id", protectedRoutes, allowedTo("admin"), analytics.deleteEvent);
+
 export default analyticsRouter;
