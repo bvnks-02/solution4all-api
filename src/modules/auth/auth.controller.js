@@ -141,7 +141,7 @@ const forgotPassword = catchAsyncError(async (req, res, next) => {
     await user.save();
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+    const resetUrl = `${frontendUrl}/#/reset-password/${resetToken}`;
 
     const emailContent = passwordResetEmail(resetUrl, user.name);
     await sendMail({
