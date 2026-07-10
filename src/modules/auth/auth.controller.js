@@ -140,7 +140,7 @@ const forgotPassword = catchAsyncError(async (req, res, next) => {
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = "https://solution4all.dz";
     const resetUrl = `${frontendUrl}/#/reset-password/${resetToken}`;
 
     const emailContent = passwordResetEmail(resetUrl, user.name);
